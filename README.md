@@ -1,4 +1,4 @@
-# 广域聊天室
+广域聊天室
 
 路径`/home/mox/1.HaiZei/6.os/7.chatroom`
 
@@ -286,6 +286,109 @@ client端：
 4. 2通知信息
 
    
+
+bug:
+
+1. 当server先断开时，chatlog会被无限打印空值
+
+   ![image-20210402192244202](https://gitee.com/xsm970228/images2020.9.5/raw/master/20210402192247.png)
+
+2. 当server断开后 client仍没有退出
+
+   ![image-20210402192416490](/home/mox/图片/Typora/image-20210402192416490.png)
+
+# v4.0
+
+bug解决：
+
+1. 当server先断开时，chatlog会被无限打印空值
+
+   ```c
+   //client 用于接收的主进程的逻辑
+   //没有判断chat_recv是否成功
+   //加上程序的第7行即可
+   freopen(logfile, "w+", stdout);
+           //FILE *log_fp = fopen(logfile, "w");
+           while(1){
+               rmsg = chat_recv(sockfd);
+               //if(rsmg.retval < 0) break;
+               if(rmsg.msg.flag == 0){
+                   printf(L_BLUE"%s"NONE" : %s\n", rmsg.msg.from, rmsg.msg.message);
+               }else if(rmsg.msg.flag == 2){
+                   printf(L_YELLOW"NOTICE"NONE": %s\n", rmsg.msg.message);
+               }else if(rmsg.msg.flag == 1){
+                   printf(L_GREEN"<private> "L_BLUE"%s"NONE" : %s\n", rmsg.msg.from, rmsg.msg.message);
+               }else if(rmsg.msg.flag == 3){
+                   printf(RED"Server end\n"NONE); 
+                   break;
+               }else{
+                   printf("error\n");
+               }
+               fflush(stdout);
+           }
+           wait(NULL);
+           close(sockfd);
+   
+   ```
+
+   
+
+2. 当server断开后 client仍没有退出
+
+   当服务端来了SIGINT信号，我们需要注册信号 当SIGINT信号来时进入handle处理函数 
+
+   函数需要将所有在线的fd关闭并发出类型3的数据包进行客户端下线
+
+   客户端有两个进程 只有接收端下线还不够
+
+   接收端即为主进程，当主进程下线后应该给子进程发送9信号
+
+   ```c
+   //server 信号处理函数
+   void handle(int sig){
+       struct Msg msg;
+       msg.flag = 3;
+       for(int i = 0; i < MAX_CLIENT; i++){
+           if(client[i].online){
+               chat_send(msg, client[i].fd);
+               close(client[i].fd);
+           }
+       }
+       exit(0);
+   }
+   
+   //client 接收端逻辑
+   else{
+           freopen(logfile, "w+", stdout);
+           //FILE *log_fp = fopen(logfile, "w");
+           while(1){
+               rmsg = chat_recv(sockfd);
+               if(rmsg.retval < 0) break;
+               if(rmsg.msg.flag == 0){
+                   printf(L_BLUE"%s"NONE" : %s\n", rmsg.msg.from, rmsg.msg.message);
+               }else if(rmsg.msg.flag == 2){
+                   printf(L_YELLOW"NOTICE"NONE": %s\n", rmsg.msg.message);
+               }else if(rmsg.msg.flag == 1){
+                   printf(L_GREEN"<private> "L_BLUE"%s"NONE" : %s\n", rmsg.msg.from, rmsg.msg.message);
+               }else if(rmsg.msg.flag == 3){
+                   printf(RED"Server end\n"NONE); 
+                   break;
+               }else{
+                   printf("error\n");
+               }
+               fflush(stdout);
+           }
+           kill(pid, 9);
+           wait(NULL);
+           close(sockfd);
+       }
+   
+   
+   ```
+
+   
+
+
 
 
 

@@ -56,6 +56,17 @@ int check_name(char *name){
     return -1;
 }
 
+void handle(int sig){
+    struct Msg msg;
+    msg.flag = 3;
+    for(int i = 0; i < MAX_CLIENT; i++){
+        if(client[i].online){
+            chat_send(msg, client[i].fd);
+            close(client[i].fd);
+        }
+    }
+    exit(0);
+}
 
 void *work(void *arg){
     int sub = *(int *)arg;
@@ -96,6 +107,7 @@ void *work(void *arg){
             }
         }
     }
+    printf("pthread end : %d\n", client_fd);
     //printf(BLUE"%s login!\n"NONE, recvmsg.msg.from);
     return NULL;
 }
@@ -111,6 +123,8 @@ int main(){
         perror("socket_create");
         return 1;
     }
+
+    signal(SIGINT, handle);
 
     while(1){
         if((fd = accept(server_listen, NULL, NULL)) < 0){

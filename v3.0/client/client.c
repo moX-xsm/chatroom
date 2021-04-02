@@ -83,6 +83,8 @@ int main(){
         //FILE *log_fp = fopen(logfile, "w");
         while(1){
             rmsg = chat_recv(sockfd);
+            if(rmsg.retval < 0) break;
+            printf("flag = %d\n", rmsg.msg.flag);
             if(rmsg.msg.flag == 0){
                 printf(L_BLUE"%s"NONE" : %s\n", rmsg.msg.from, rmsg.msg.message);
             }else if(rmsg.msg.flag == 2){
